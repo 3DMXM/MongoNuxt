@@ -4,15 +4,15 @@
 
 ## 功能特性
 
-- 🔗 **数据库连接** - 通过连接字符串连接到 MongoDB 数据库
-- 📊 **数据库浏览** - 浏览数据库和集合列表
-- 📄 **文档查看** - 查看和预览文档内容
-- 🌙 **深色模式** - 支持浅色/深色主题切换
-- 📱 **响应式设计** - 适配桌面和移动设备
-- 🎨 **现代化 UI** - 基于 Nuxt UI 的美观界面
-- 📋 **文档复制** - 一键复制文档到剪贴板
-- 🔄 **实时刷新** - 实时刷新数据库内容
-- 🚨 **错误处理** - 完善的错误提示和加载状态
+- 通过连接字符串连接到 MongoDB 数据库
+- 数据库、集合、索引 的 新增、删除、编辑、重命名 操作
+- 查看和预览文档内容
+- 支持浅色/深色主题切换
+- 适配桌面和移动设备
+- 基于 Nuxt UI 的美观界面
+- 一键复制文档到剪贴板
+- 实时刷新数据库内容
+- 完善的错误提示和加载状态
 
 ## 技术栈
 
@@ -118,17 +118,62 @@ npm run preview # 本地预览构建后的应用
 
 常见部署目标：Vercel、Cloudflare Pages（或 Workers）、Netlify、以及自托管（使用 node 或 docker 运行 Nitro）。
 
-Docker 简单示例（可选）：
+### 使用 Docker（基于 pm2-runtime）
 
-```dockerfile
-# Dockerfile (示例)
-FROM node:18-alpine
-WORKDIR /app
-COPY . .
-RUN npm ci && npm run build
-EXPOSE 3000
-CMD ["node", ".output/server/index.mjs"]
+本项目自带 `Dockerfile`，镜像使用多阶段构建：在构建阶段安装依赖并执行 `npm run build`，在生产阶段仅复制构建产物（`./.output`）和生产依赖，并通过 `pm2-runtime pm2ecosystem.config.cjs` 启动服务（`pm2ecosystem.config.cjs` 指向 `./.output/server/index.mjs`）。
+
+建议的构建与运行命令（PowerShell）：
+
+```powershell
+# 在项目根目录构建镜像
+docker build -t mongo-nuxt:latest .
+
+# 运行容器（将容器内 4659 端口映射到宿主机 4659）
+docker run -d --name mongo-nuxt -p 4659:4659 mongo-nuxt:latest
+
+# 查看日志
+docker logs -f mongo-nuxt
 ```
+
+如果想把容器端口映射到宿主机的 80 端口：
+
+```powershell
+docker run -d --name mongo-nuxt -p 80:4659 mongo-nuxt:latest
+```
+
+简短说明与注意事项：
+- `pm2ecosystem.config.cjs` 中配置的 `script` 默认为 `./.output/server/index.mjs`，且已在仓库中设置端口 `4659`；如需改端口，请编辑 `pm2ecosystem.config.cjs` 或在容器运行时使用环境变量覆盖（如果你实现了读取环境变量）。
+- 当前 `Dockerfile` 会在生产阶段以非 root 用户运行进程，且只安装 production 依赖以减小镜像体积。
+- 若要保证可重复构建，建议在源码仓库提交 `package-lock.json` 并在 Dockerfile 中使用 `npm ci`。
+
+可选的 `docker-compose.yml` 示例：
+
+```yaml
+version: '3.8'
+services:
+   app:
+      image: mongo-nuxt:latest
+      build: .
+      ports:
+         - "4659:4659"
+      environment:
+         - NODE_ENV=production
+         # - MONGO_URI=mongodb://mongo:27017
+      restart: unless-stopped
+
+   # 可选：本地 MongoDB 服务示例
+   # mongo:
+   #   image: mongo:6
+   #   volumes:
+   #     - mongo-data:/data/db
+
+#volumes:
+#  mongo-data:
+```
+
+故障排查：
+- 构建失败时请检查构建日志，确认项目依赖是否完整；若仓库没有 `package-lock.json`，镜像构建会使用 `npm install`。提交 lockfile 后可改回使用 `npm ci` 来加快并稳定构建。
+- 若容器启动但无法访问页面，检查容器日志与 pm2 日志，确认 `.output` 构建成功且监听端口为 4659。
 
 注意：不同部署平台对 Nitro 的适配方式不同，参见 Nuxt 官方部署文档以获得平台最佳实践。
 

@@ -1,5 +1,5 @@
 {
-  "name": "nuxt-app",
+  "name": "mongo-nuxt",
   "type": "module",
   "private": true,
   "scripts": {
@@ -7,6 +7,7 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
+    "start": "pm2-runtime pm2ecosystem.config.cjs",
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
@@ -14,14 +15,13 @@
     "@nuxt/ui": "^3.3.2",
     "@pinia/nuxt": "^0.11.2",
     "element-plus": "^2.10.7",
-    "mongodb": "^5.11.0",
+  "mongodb": "^6.18.0",
     "nuxt": "^4.0.3",
     "nuxt-mongodb": "^1.0.13",
     "pinia": "^3.0.3",
     "vue": "^3.5.18",
+    "@nuxtjs/google-fonts": "^3.2.0",
     "vue-router": "^4.5.1"
   },
-  "devDependencies": {
-    "@nuxtjs/google-fonts": "^3.2.0"
-  }
+  "devDependencies": {}
 }
