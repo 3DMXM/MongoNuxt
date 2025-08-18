@@ -31,6 +31,26 @@ export const useMongoStore = defineStore('mongo', {
             this.activeCollection = null
             return this.collections
         },
+        async createCollection(db: string, collection: string) {
+            const res = await (globalThis as any).$fetch('/api/mongo/collection/create', { method: 'POST', body: { db, collection } })
+            // refresh collection list
+            await this.listCollections(db)
+            return res
+        },
+
+        async deleteCollection(db: string, collection: string) {
+            const res = await (globalThis as any).$fetch('/api/mongo/collection/delete', { method: 'POST', body: { db, collection } })
+            // refresh collection list
+            await this.listCollections(db)
+            return res
+        },
+
+        async renameCollection(db: string, from: string, to: string, dropTarget = false) {
+            const res = await (globalThis as any).$fetch('/api/mongo/collection/rename', { method: 'POST', body: { db, from, to, dropTarget } })
+            // refresh collection list
+            await this.listCollections(db)
+            return res
+        },
         async find(db: string, collection: string, filter = {}, limit = 20) {
             this.activeDb = db
             this.activeCollection = collection
@@ -52,6 +72,20 @@ export const useMongoStore = defineStore('mongo', {
         },
         async deleteDocument(db: string, collection: string, filter: any, deleteMany = false) {
             const res = await (globalThis as any).$fetch('/api/mongo/delete', { method: 'POST', body: { db, collection, filter, deleteMany } })
+            return res
+        },
+        async createIndex(db: string, collection: string, indexSpec: any, options: any = {}) {
+            const res = await (globalThis as any).$fetch('/api/mongo/index/create', { method: 'POST', body: { db, collection, indexSpec, options } })
+            return res
+        },
+
+        async updateIndex(db: string, collection: string, indexName: string, newIndexSpec: any, options: any = {}) {
+            const res = await (globalThis as any).$fetch('/api/mongo/index/update', { method: 'POST', body: { db, collection, indexName, newIndexSpec, options } })
+            return res
+        },
+
+        async deleteIndex(db: string, collection: string, indexName: string) {
+            const res = await (globalThis as any).$fetch('/api/mongo/index/delete', { method: 'POST', body: { db, collection, indexName } })
             return res
         },
         async refreshDocuments() {
