@@ -59,7 +59,14 @@ export const useMongoStore = defineStore('mongo', {
                 return await this.find(this.activeDb, this.activeCollection, {}, 20)
             }
         },
-        disconnect() {
+        async disconnect() {
+            // Ask server to close its Mongo client to allow reconnecting to another URI
+            try {
+                await (globalThis as any).$fetch('/api/mongo/disconnect', { method: 'POST' })
+            } catch (err) {
+                // ignore server errors; still clear local state
+            }
+
             this.uri = ''
             this.connected = false
             this.databases = []

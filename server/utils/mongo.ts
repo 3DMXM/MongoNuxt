@@ -4,7 +4,16 @@ import { MongoClient } from 'mongodb'
 let client: MongoClient | null = null
 
 export async function connect(uri: string) {
-    if (client) return client
+    // If there's an existing client, close it first so a new URI takes effect
+    if (client) {
+        try {
+            await client.close()
+        } catch (err) {
+            // ignore errors when closing previous client
+        }
+        client = null
+    }
+
     client = new MongoClient(uri)
     await client.connect()
     return client
