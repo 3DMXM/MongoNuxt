@@ -19,6 +19,25 @@
                     刷新
                 </el-button>
             </div>
+
+            <!-- Filter input -->
+            <div class="flex items-center space-x-2">
+                <el-input
+                    v-model="filterText"
+                    placeholder='输入 JSON 查询，例如: {"name":"Alice"}'
+                    size="small"
+                    clearable
+                    class="w-64"
+                />
+                <el-button @click="applyFilter" size="small">筛选</el-button>
+                <el-button
+                    @click="clearFilter"
+                    size="small"
+                    :disabled="!hasFilter"
+                    >清除</el-button
+                >
+            </div>
+
             <div class="text-sm text-gray-500 dark:text-gray-400">
                 共 {{ docs.length }} 个文档
             </div>
@@ -133,7 +152,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from "vue";
+import { ref, reactive, computed } from "vue";
 import { useMongoStore } from "../../stores/mongo";
 import { ElMessage } from "element-plus";
 import {
@@ -152,6 +171,7 @@ const props = defineProps<{ docs: Array<any> }>();
 const emit = defineEmits<{
     loadMore: [];
     refresh: [];
+    filter: [filter: any | null];
 }>();
 
 const store = useMongoStore();
@@ -163,6 +183,30 @@ const showDeleteConfirm = ref(false);
 const selectedDocument = ref<any>(null);
 const isEditMode = ref(false);
 const refreshing = ref(false);
+
+// Filter state
+const filterText = ref("");
+
+const hasFilter = computed(() => filterText.value.trim().length > 0);
+
+function applyFilter() {
+    if (!filterText.value.trim()) {
+        emit("filter", null);
+        return;
+    }
+
+    try {
+        const parsed = JSON.parse(filterText.value);
+        emit("filter", parsed);
+    } catch (err: any) {
+        ElMessage.error("无效的 JSON 查询");
+    }
+}
+
+function clearFilter() {
+    filterText.value = "";
+    emit("filter", null);
+}
 
 function formatJson(obj: any) {
     try {

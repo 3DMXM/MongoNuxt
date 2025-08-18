@@ -155,6 +155,7 @@
                         <DocumentPreview
                             :docs="store.docs"
                             @refresh="refreshDocuments"
+                            @filter="onApplyFilter"
                         />
                     </UCard>
                 </div>
@@ -198,6 +199,7 @@ import { ElMessage } from "element-plus";
 const store = useMongoStore();
 const loading = ref(false);
 const connectionLoading = ref(false);
+const currentFilter = ref<any>(null);
 
 async function onConnect(uri: string) {
     if (!uri.trim()) {
@@ -235,6 +237,7 @@ async function selectCollection(collection: string) {
 
     loading.value = true;
     try {
+        currentFilter.value = null;
         await store.find(store.activeDb, collection, {}, 20);
         ElMessage.info(`已加载 ${store.docs.length} 个文档`);
     } catch (error: any) {
@@ -249,10 +252,38 @@ async function refreshDocuments() {
 
     loading.value = true;
     try {
-        await store.find(store.activeDb, store.activeCollection, {}, 20);
+        await store.find(
+            store.activeDb,
+            store.activeCollection,
+            currentFilter.value || {},
+            20
+        );
         ElMessage.success(`已重新加载 ${store.docs.length} 个文档`);
     } catch (error: any) {
         ElMessage.error(error.message || "无法刷新文档");
+    } finally {
+        loading.value = false;
+    }
+}
+
+async function onApplyFilter(filter: any | null) {
+    if (!store.activeDb || !store.activeCollection) {
+        ElMessage.warning("请先选择数据库和集合");
+        return;
+    }
+
+    currentFilter.value = filter;
+    loading.value = true;
+    try {
+        await store.find(
+            store.activeDb,
+            store.activeCollection,
+            filter || {},
+            20
+        );
+        ElMessage.success(`筛选后 ${store.docs.length} 个文档`);
+    } catch (error: any) {
+        ElMessage.error(error.message || "筛选失败");
     } finally {
         loading.value = false;
     }
