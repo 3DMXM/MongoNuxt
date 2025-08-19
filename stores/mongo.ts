@@ -1,5 +1,53 @@
 import { defineStore } from 'pinia'
 
+// client-side connection history stored in a cookie
+const HISTORY_COOKIE_KEY = 'mongo_connections'
+const MAX_HISTORY = 10
+
+function readCookie(name: string) {
+    if (typeof document === 'undefined') return null
+    const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.*+?^${}()|[\\]\\\\])/g, '\\$1') + '=([^;]*)'))
+    return m ? decodeURIComponent(m[1]!) : null
+}
+
+function writeCookie(name: string, value: string, days = 365) {
+    if (typeof document === 'undefined') return
+    const d = new Date()
+    d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000)
+    document.cookie = `${name}=${encodeURIComponent(value)}; path=/; expires=${d.toUTCString()}`
+}
+
+function getHistoryFromCookie(): string[] {
+    try {
+        const raw = readCookie(HISTORY_COOKIE_KEY)
+        if (!raw) return []
+        const parsed = JSON.parse(raw)
+        return Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string') : []
+    } catch (e) {
+        return []
+    }
+}
+
+function saveHistoryToCookie(arr: string[]) {
+    try {
+        writeCookie(HISTORY_COOKIE_KEY, JSON.stringify(arr))
+    } catch (e) {
+        // ignore
+    }
+}
+
+function addToHistory(u: string) {
+    if (typeof document === 'undefined') return
+    if (!u || !u.trim()) return
+    const list = getHistoryFromCookie()
+    const normalized = u.trim()
+    const idx = list.indexOf(normalized)
+    if (idx !== -1) list.splice(idx, 1)
+    list.unshift(normalized)
+    if (list.length > MAX_HISTORY) list.length = MAX_HISTORY
+    saveHistoryToCookie(list)
+}
+
 export const useMongoStore = defineStore('mongo', {
     state: () => ({
         uri: '',
@@ -18,6 +66,9 @@ export const useMongoStore = defineStore('mongo', {
             this.uri = uri
             const res = await (globalThis as any).$fetch('/api/mongo/connect', { method: 'POST', body: { uri } })
             this.connected = !!(res as any).success
+            if (this.connected) {
+                try { addToHistory(uri) } catch (e) { }
+            }
             return res
         },
         async listDatabases() {
