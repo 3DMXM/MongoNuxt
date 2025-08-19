@@ -40,6 +40,7 @@
                         class="w-4 h-4"
                     />
                     <!-- per-db actions -->
+                    <!-- per-db actions -->
                     <UButton
                         size="xs"
                         variant="ghost"

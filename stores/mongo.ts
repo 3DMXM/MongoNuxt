@@ -139,6 +139,96 @@ export const useMongoStore = defineStore('mongo', {
             const res = await (globalThis as any).$fetch('/api/mongo/index/delete', { method: 'POST', body: { db, collection, indexName } })
             return res
         },
+        // export database as downloadable JSON
+        // supports optional onProgress(loaded:number, total:number) callback
+        async exportDatabase(db: string, onProgress?: (loaded: number, total: number) => void) {
+            const url = `/api/mongo/database/export?db=${encodeURIComponent(db)}`
+            const res = await fetch(url)
+            if (!res.ok) throw new Error('导出失败')
+
+            // try to stream response body to report progress when possible
+            const contentLength = res.headers.get('content-length')
+            const total = contentLength ? parseInt(contentLength, 10) : 0
+
+            // if body is not a stream (older fetch polyfills), fallback to blob
+            if (!res.body || typeof (res.body as any).getReader !== 'function') {
+                const blob = await res.blob()
+                return { blob, filename: res.headers.get('content-disposition') }
+            }
+
+            const reader = (res.body as ReadableStream<Uint8Array>).getReader()
+            const chunks: Uint8Array[] = []
+            let loaded = 0
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                if (value) {
+                    chunks.push(value)
+                    loaded += value.length
+                    try { if (typeof onProgress === 'function') onProgress(loaded, total) } catch (e) { }
+                }
+            }
+
+            // concatenate chunks into single Uint8Array
+            const totalLen = chunks.reduce((s, c) => s + c.length, 0)
+            const all = new Uint8Array(totalLen)
+            let offset = 0
+            for (const c of chunks) {
+                all.set(c, offset)
+                offset += c.length
+            }
+            const blob = new Blob([all.buffer])
+            return { blob, filename: res.headers.get('content-disposition') }
+        },
+        // import database from uploaded file (multipart/form-data)
+        // supports progress callback: onProgress(loaded:number, total:number)
+        importDatabase(db: string, file: File, onProgress?: (loaded: number, total: number) => void) {
+            const url = `/api/mongo/database/import?db=${encodeURIComponent(db)}`
+            return new Promise<any>((resolve, reject) => {
+                const xhr = new XMLHttpRequest()
+                xhr.open('POST', url)
+
+                xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            const json = xhr.responseText ? JSON.parse(xhr.responseText) : {}
+                            resolve(json)
+                        } catch (e) {
+                            resolve({})
+                        }
+                    } else {
+                        const txt = xhr.responseText || `导入失败: ${xhr.status}`
+                        reject(new Error(txt))
+                    }
+                }
+
+                xhr.onerror = () => reject(new Error('网络错误，上传失败'))
+
+                if (xhr.upload && typeof onProgress === 'function') {
+                    xhr.upload.onprogress = (ev: ProgressEvent) => {
+                        try { onProgress(ev.loaded, ev.total) } catch (e) { }
+                    }
+                }
+
+                const fd = new FormData()
+                fd.append('file', file)
+                xhr.send(fd)
+            })
+        },
+        // create a server-side backup file and return filename
+        async backupDatabase(db: string) {
+            const res = await (globalThis as any).$fetch('/api/mongo/database/backup', { method: 'POST', body: { db } })
+            return res
+        },
+        // download a previously created backup
+        async downloadBackup(filename: string) {
+            const url = `/api/mongo/database/download?filename=${encodeURIComponent(filename)}`
+            const res = await fetch(url)
+            if (!res.ok) throw new Error('下载失败')
+            const blob = await res.blob()
+            return { blob }
+        },
         async refreshDocuments() {
             if (this.activeDb && this.activeCollection) {
                 return await this.find(this.activeDb, this.activeCollection, {}, 20)

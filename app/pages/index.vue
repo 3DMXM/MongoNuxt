@@ -255,12 +255,87 @@
                                     @click="openRenameDbDialog(store.activeDb)"
                                     >重命名数据库</UButton
                                 >
+
                                 <UButton
                                     size="sm"
-                                    color="error"
-                                    :disabled="!store.activeDb"
-                                    @click="openDeleteDbDialog(store.activeDb)"
-                                    >删除数据库</UButton
+                                    :disabled="!store.activeDb || exporting"
+                                    :loading="exporting"
+                                    @click="onExportDb(store.activeDb)"
+                                >
+                                    导出数据库
+                                </UButton>
+
+                                <div v-if="exporting" class="mt-2 space-y-2">
+                                    <div
+                                        class="flex items-center justify-between"
+                                    >
+                                        <span class="text-sm font-medium"
+                                            >导出进度</span
+                                        >
+                                        <span class="text-sm text-gray-500"
+                                            >{{ exportProgress }}%</span
+                                        >
+                                    </div>
+
+                                    <div
+                                        class="w-full bg-gray-200 h-2 rounded overflow-hidden"
+                                    >
+                                        <div
+                                            class="bg-blue-500 h-2 transition-all"
+                                            :style="{
+                                                width: exportProgress + '%',
+                                            }"
+                                        ></div>
+                                    </div>
+
+                                    <div class="text-xs text-gray-500">
+                                        <div v-if="exportCurrentCollection">
+                                            当前集合:
+                                            {{ exportCurrentCollection }}
+                                        </div>
+                                        <div v-if="processedDocuments > 0">
+                                            已处理:
+                                            {{
+                                                processedDocuments.toLocaleString()
+                                            }}
+                                            /
+                                            {{
+                                                exportTotal.toLocaleString()
+                                            }}
+                                            文档
+                                        </div>
+                                        <div v-if="exportRate > 0">
+                                            速度:
+                                            {{
+                                                Math.round(
+                                                    exportRate
+                                                ).toLocaleString()
+                                            }}
+                                            文档/秒
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <UButton
+                                            size="sm"
+                                            color="error"
+                                            @click="cancelExport"
+                                            >取消导出</UButton
+                                        >
+                                    </div>
+                                </div>
+                                <UButton
+                                    size="sm"
+                                    :disabled="!store.activeDb || importing"
+                                    :loading="importing"
+                                    @click="onImportDb(store.activeDb)"
+                                    >导入数据库</UButton
+                                >
+                                <UButton
+                                    size="sm"
+                                    :disabled="!store.activeDb || backingUp"
+                                    :loading="backingUp"
+                                    @click="onBackupDb(store.activeDb)"
+                                    >备份数据库</UButton
                                 >
                                 <UButton
                                     size="sm"
@@ -272,6 +347,13 @@
                                             )
                                     "
                                     >索引管理</UButton
+                                >
+                                <UButton
+                                    size="sm"
+                                    color="error"
+                                    :disabled="!store.activeDb"
+                                    @click="openDeleteDbDialog(store.activeDb)"
+                                    >删除数据库</UButton
                                 >
                             </div>
                         </UCard>
@@ -391,6 +473,15 @@
             </template>
         </el-dialog>
     </div>
+
+    <!-- hidden file input for import -->
+    <input
+        ref="importFileInput"
+        type="file"
+        accept="application/json,application/gzip,.gz,.gzip"
+        style="display: none"
+        @change="handleImportFile"
+    />
 </template>
 
 <script setup lang="ts">
@@ -419,6 +510,22 @@ const renameFrom = ref<string | null>(null);
 const renameTo = ref("");
 const showDeleteColl = ref(false);
 const deleteTarget = ref<string | null>(null);
+// file input ref for import
+const importFileInput = ref<HTMLInputElement | null>(null);
+const importProgress = ref(0);
+const showImportConfirm = ref(false);
+// status flags for DB operations
+const exporting = ref(false);
+const importing = ref(false);
+const backingUp = ref(false);
+const exportProgress = ref(0);
+// enhanced export tracking
+const processedDocuments = ref(0);
+const exportTotal = ref(0);
+const exportRate = ref(0);
+const exportCurrentCollection = ref("");
+let currentExportId = "";
+let exportEventSource: EventSource | null = null;
 
 // pagination handlers
 async function onPageChange(page: number) {
@@ -713,6 +820,256 @@ function scrollToTop() {
 function openGitHub() {
     window.open("https://github.com/3DMXM/MongoNuxt", "_blank");
 }
+
+// Database export/import/backup handlers
+async function onExportDb(db: string) {
+    exporting.value = true;
+    exportProgress.value = 0;
+    processedDocuments.value = 0;
+    exportTotal.value = 0;
+    exportRate.value = 0;
+    exportCurrentCollection.value = "";
+
+    try {
+        // initiate HEAD to get export ID for tracking
+        const params = new URLSearchParams({ db });
+        const exportUrl = `/api/mongo/database/export-enhanced?${params}`;
+        let exportId = "";
+
+        try {
+            const headResp = await fetch(exportUrl, { method: "HEAD" });
+            exportId = headResp.headers.get("X-Export-ID") || "";
+        } catch (e) {
+            console.warn("Failed to obtain export id via HEAD:", e);
+        }
+
+        // if we got an exportId, open real progress SSE
+        if (exportId) {
+            currentExportId = exportId;
+            const sseUrl = `/api/mongo/database/export-real-progress?exportId=${encodeURIComponent(
+                exportId
+            )}`;
+            exportEventSource = new EventSource(sseUrl);
+
+            exportEventSource.addEventListener(
+                "progress",
+                (e: MessageEvent) => {
+                    try {
+                        const data = JSON.parse(e.data);
+                        processedDocuments.value =
+                            data.processed || processedDocuments.value;
+                        exportTotal.value = data.total || exportTotal.value;
+                        exportProgress.value =
+                            data.overallProgress || exportProgress.value;
+                        exportRate.value = data.rate || exportRate.value;
+                        exportCurrentCollection.value =
+                            data.currentCollection ||
+                            exportCurrentCollection.value;
+                    } catch (err) {
+                        console.warn("Invalid progress data", err);
+                    }
+                }
+            );
+
+            exportEventSource.addEventListener(
+                "done",
+                async (e: MessageEvent) => {
+                    try {
+                        const data = JSON.parse(e.data);
+                        processedDocuments.value =
+                            data.processed || processedDocuments.value;
+                        exportTotal.value = data.total || exportTotal.value;
+                        exportProgress.value = 100;
+                    } catch (err) {}
+
+                    // download the exported file via store API fallback
+                    try {
+                        const res = await store.exportDatabase(db);
+                        const blob = res.blob;
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        let fname = `${db}-export.json`;
+                        try {
+                            const cd = res.filename;
+                            if (cd && typeof cd === "string") {
+                                const m = cd.match(/filename="?(.*)"?/) || [];
+                                if (m[1]) fname = m[1];
+                            }
+                        } catch (e) {}
+                        a.download = fname;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+                        ElMessage.success("导出已完成并下载");
+                    } catch (err) {
+                        console.warn("Download fallback failed", err);
+                    } finally {
+                        if (exportEventSource) {
+                            exportEventSource.close();
+                            exportEventSource = null;
+                        }
+                        currentExportId = "";
+                        exporting.value = false;
+                    }
+                }
+            );
+
+            exportEventSource.addEventListener("error", (e: any) => {
+                console.warn("Export SSE error", e);
+                if (exportEventSource) {
+                    exportEventSource.close();
+                    exportEventSource = null;
+                }
+                currentExportId = "";
+                exporting.value = false;
+            });
+
+            // trigger download by navigating to export URL
+            const a = document.createElement("a");
+            a.href = exportUrl;
+            a.download = `${db}-export-${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+
+            // wait until SSE 'done' or timeout
+            // timeout handled by backend SSE endpoint
+        } else {
+            // fallback: direct export
+            const res = await store.exportDatabase(db);
+            const blob = res.blob;
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            let fname = `${db}-export.json`;
+            try {
+                const cd = res.filename;
+                if (cd && typeof cd === "string") {
+                    const m = cd.match(/filename="?(.*)"?/) || [];
+                    if (m[1]) fname = m[1];
+                }
+            } catch (e) {}
+            a.download = fname;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            ElMessage.success("导出已开始（回退）");
+            exporting.value = false;
+        }
+    } catch (err: any) {
+        ElMessage.error(err.message || "导出失败");
+        exporting.value = false;
+    }
+}
+
+function onImportDb(db: string) {
+    // set dataset-attr to know target db
+    if (!importFileInput.value) return;
+    importFileInput.value.dataset.db = db;
+    importFileInput.value.click();
+}
+
+async function handleImportFile(e: Event) {
+    const inp = e.target as HTMLInputElement;
+    const files = inp.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    const db = inp.dataset.db;
+    if (!db) return ElMessage.error("未知目标数据库");
+    try {
+        if (!file) throw new Error("请选择文件");
+
+        // ask for confirmation because import will drop existing collections
+        await ElMessageBox.confirm(
+            `即将导入 ${file.name} 到数据库 ${db}，导入过程会替换已存在的集合，是否继续？`,
+            "导入确认",
+            { type: "warning" }
+        );
+
+        importing.value = true;
+        importProgress.value = 0;
+
+        await store.importDatabase(db, file, (loaded, total) => {
+            if (total > 0)
+                importProgress.value = Math.round((loaded / total) * 100);
+        });
+
+        ElMessage.success("导入完成");
+        await store.listDatabases();
+    } catch (err: any) {
+        if (err && err.message && err.message.includes("取消")) {
+            ElMessage.info("已取消导入");
+        } else {
+            ElMessage.error(err.message || "导入失败");
+        }
+    } finally {
+        importing.value = false;
+        // clear input
+        inp.value = "" as any;
+        delete inp.dataset.db;
+        importProgress.value = 0;
+    }
+}
+
+async function onBackupDb(db: string) {
+    backingUp.value = true;
+    try {
+        const res = await store.backupDatabase(db);
+        if (res && res.filename) {
+            // auto-download backup
+            const d = await store.downloadBackup(res.filename);
+            const url = URL.createObjectURL(d.blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = res.filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            ElMessage.success("备份并下载完成");
+        } else {
+            ElMessage.success("备份已创建");
+        }
+    } catch (err: any) {
+        ElMessage.error(err.message || "备份失败");
+    } finally {
+        backingUp.value = false;
+    }
+}
+
+// cancel export (call server endpoint)
+async function cancelExport() {
+    if (!currentExportId) return;
+    try {
+        await $fetch("/api/mongo/database/export-cancel", {
+            method: "POST",
+            body: { exportId: currentExportId },
+        });
+        ElMessage.info("已请求取消导出");
+    } catch (e) {
+        console.warn("Cancel export failed", e);
+    } finally {
+        if (exportEventSource) {
+            exportEventSource.close();
+            exportEventSource = null;
+        }
+        currentExportId = "";
+        exporting.value = false;
+    }
+}
+
+// cleanup on unmount
+onBeforeUnmount(() => {
+    if (exportEventSource) {
+        try {
+            exportEventSource.close();
+        } catch (e) {}
+        exportEventSource = null;
+    }
+});
 
 // SEO Meta
 useHead({

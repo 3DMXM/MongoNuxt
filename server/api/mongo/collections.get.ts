@@ -1,4 +1,4 @@
-import { getClient } from '../../utils/mongo'
+import { getClient } from '@@/server/utils/mongo'
 
 export default defineEventHandler(async (event) => {
     const query = getQuery(event)

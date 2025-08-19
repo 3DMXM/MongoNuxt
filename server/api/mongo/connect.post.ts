@@ -1,4 +1,4 @@
-import { connect } from '../../utils/mongo'
+import { getClient } from '@@/server/utils/mongo'
 import { readBody, createError } from 'h3'
 
 export default defineEventHandler(async (event) => {

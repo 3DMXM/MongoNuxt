@@ -1,4 +1,4 @@
-import { closeClient } from '../../utils/mongo'
+import { getClient } from '@@/server/utils/mongo'
 import { createError } from 'h3'
 
 export default defineEventHandler(async () => {
