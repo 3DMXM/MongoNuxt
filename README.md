@@ -2,6 +2,18 @@
 
 一个基于 Nuxt 3 和 Nuxt UI 构建的现代化 MongoDB 数据库管理工具。
 
+## 预览
+
+
+下面是应用界面的预览（每行两张，使用仓库内的 images 目录图片）：
+
+|                                                           |                                                           |
+| --------------------------------------------------------: | :-------------------------------------------------------- |
+| <img src="./images/1.webp" alt="preview 1" width="400" /> | <img src="./images/2.webp" alt="preview 2" width="400" /> |
+| <img src="./images/3.webp" alt="preview 3" width="400" /> | <img src="./images/4.webp" alt="preview 4" width="400" /> |
+
+
+
 ## 功能特性
 
 - 通过连接字符串连接到 MongoDB 数据库
