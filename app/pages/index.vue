@@ -82,6 +82,32 @@
                                 <UBadge color="info" variant="soft" size="sm">
                                     {{ store.databases.length }}
                                 </UBadge>
+                                <div
+                                    class="ml-auto flex items-center space-x-2"
+                                >
+                                    <UButton
+                                        size="sm"
+                                        @click="showCreateDb = true"
+                                        >新建数据库</UButton
+                                    >
+                                    <UButton
+                                        size="sm"
+                                        :disabled="!store.activeDb"
+                                        @click="
+                                            openRenameDbDialog(store.activeDb)
+                                        "
+                                        >重命名</UButton
+                                    >
+                                    <UButton
+                                        size="sm"
+                                        color="error"
+                                        :disabled="!store.activeDb"
+                                        @click="
+                                            openDeleteDbDialog(store.activeDb)
+                                        "
+                                        >删除</UButton
+                                    >
+                                </div>
                             </div>
                         </template>
 
@@ -89,6 +115,8 @@
                             :databases="store.databases"
                             :activeDb="store.activeDb"
                             @select="selectDb"
+                            @rename-db="openRenameDbDialog"
+                            @delete-db="openDeleteDbDialog"
                         />
                     </UCard>
 
@@ -249,6 +277,52 @@
                 </div>
             </template>
         </el-dialog>
+
+        <!-- Create Database Dialog -->
+        <el-dialog v-model="showCreateDb" title="新建数据库">
+            <div>
+                <el-input v-model="newDbName" placeholder="数据库名" />
+            </div>
+            <template #footer>
+                <div class="flex justify-end space-x-2">
+                    <el-button @click="showCreateDb = false">取消</el-button>
+                    <el-button type="primary" @click="createDatabaseConfirmed"
+                        >创建</el-button
+                    >
+                </div>
+            </template>
+        </el-dialog>
+
+        <!-- Rename Database Dialog -->
+        <el-dialog v-model="showRenameDb" title="重命名数据库">
+            <div>
+                <el-input v-model="renameDbTo" placeholder="新的数据库名" />
+            </div>
+            <template #footer>
+                <div class="flex justify-end space-x-2">
+                    <el-button @click="showRenameDb = false">取消</el-button>
+                    <el-button type="primary" @click="renameDatabaseConfirmed"
+                        >确定</el-button
+                    >
+                </div>
+            </template>
+        </el-dialog>
+
+        <!-- Delete Database Confirm -->
+        <el-dialog v-model="showDeleteDb" title="删除数据库">
+            <div>
+                确认要删除数据库：<strong>{{ deleteDbTarget }}</strong> ?
+                此操作不可恢复。
+            </div>
+            <template #footer>
+                <div class="flex justify-end space-x-2">
+                    <el-button @click="showDeleteDb = false">取消</el-button>
+                    <el-button type="danger" @click="deleteDatabaseConfirmed"
+                        >删除</el-button
+                    >
+                </div>
+            </template>
+        </el-dialog>
     </div>
 </template>
 
@@ -266,6 +340,13 @@ const showIndexManager = ref(false);
 const indexManagerCollection = ref<string | null>(null);
 const showCreateColl = ref(false);
 const newCollectionName = ref("");
+const showCreateDb = ref(false);
+const newDbName = ref("");
+const showRenameDb = ref(false);
+const renameDbFrom = ref<string | null>(null);
+const renameDbTo = ref("");
+const showDeleteDb = ref(false);
+const deleteDbTarget = ref<string | null>(null);
 const showRenameColl = ref(false);
 const renameFrom = ref<string | null>(null);
 const renameTo = ref("");
@@ -400,6 +481,63 @@ async function renameCollection() {
 function openDeleteCollectionDialog(collection: string) {
     deleteTarget.value = collection;
     showDeleteColl.value = true;
+}
+
+function openRenameDbDialog(db: string | null) {
+    if (!db) return;
+    renameDbFrom.value = db;
+    renameDbTo.value = db;
+    showRenameDb.value = true;
+}
+
+function openDeleteDbDialog(db: string | null) {
+    if (!db) return;
+    deleteDbTarget.value = db;
+    showDeleteDb.value = true;
+}
+
+async function createDatabaseConfirmed() {
+    if (!newDbName.value.trim()) {
+        ElMessage.warning("请输入数据库名");
+        return;
+    }
+    try {
+        await store.createDatabase(newDbName.value.trim());
+        ElMessage.success("数据库已创建");
+        showCreateDb.value = false;
+        newDbName.value = "";
+    } catch (err: any) {
+        ElMessage.error("创建失败: " + (err.message || String(err)));
+    }
+}
+
+async function deleteDatabaseConfirmed() {
+    if (!deleteDbTarget.value) return;
+    try {
+        await store.deleteDatabase(deleteDbTarget.value);
+        ElMessage.success("数据库已删除");
+        showDeleteDb.value = false;
+        deleteDbTarget.value = null;
+    } catch (err: any) {
+        ElMessage.error("删除失败: " + (err.message || String(err)));
+    }
+}
+
+async function renameDatabaseConfirmed() {
+    if (!renameDbFrom.value) return;
+    if (!renameDbTo.value.trim()) {
+        ElMessage.warning("请输入目标数据库名");
+        return;
+    }
+    try {
+        await store.renameDatabase(renameDbFrom.value, renameDbTo.value.trim());
+        ElMessage.success("数据库已重命名");
+        showRenameDb.value = false;
+        renameDbFrom.value = null;
+        renameDbTo.value = "";
+    } catch (err: any) {
+        ElMessage.error("重命名失败: " + (err.message || String(err)));
+    }
 }
 
 async function deleteCollectionConfirmed() {

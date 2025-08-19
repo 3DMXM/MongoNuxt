@@ -39,6 +39,22 @@
                         name="i-heroicons-chevron-right"
                         class="w-4 h-4"
                     />
+                    <!-- per-db actions -->
+                    <UButton
+                        size="xs"
+                        variant="ghost"
+                        @click.stop="() => emit('rename-db', db.name)"
+                    >
+                        <UIcon name="i-heroicons-pencil" class="w-3 h-3" />
+                    </UButton>
+                    <UButton
+                        size="xs"
+                        variant="ghost"
+                        color="error"
+                        @click.stop="() => emit('delete-db', db.name)"
+                    >
+                        <UIcon name="i-heroicons-trash" class="w-3 h-3" />
+                    </UButton>
                 </div>
             </UButton>
         </div>
@@ -53,6 +69,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     select: [dbName: string];
+    "rename-db": [dbName: string];
+    "delete-db": [dbName: string];
 }>();
 
 function formatSize(bytes: number): string {

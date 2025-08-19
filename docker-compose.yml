@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # Nuxt.js 应用
+  mongonux:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mongonux-app
+    restart: unless-stopped
+    ports:
+      - "4659:4659"
+    environment:
+      - NODE_ENV=production
+      - NUXT_HOST=0.0.0.0
+      - NUXT_PORT=4659
+    networks:
+      - nuxt-network
+    volumes:
+      - ./:/app # 项目目录与当前目录绑定
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4659/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # command: yarn run server
+
+# 网络
+networks:
+  nuxt-network:
+    driver: bridge

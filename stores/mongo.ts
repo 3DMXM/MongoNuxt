@@ -22,6 +22,33 @@ export const useMongoStore = defineStore('mongo', {
             this.databases = (res as any).databases || []
             return this.databases
         },
+        async createDatabase(db: string) {
+            const res = await (globalThis as any).$fetch('/api/mongo/database/create', { method: 'POST', body: { db } })
+            // refresh database list
+            await this.listDatabases()
+            return res
+        },
+        async deleteDatabase(db: string) {
+            const res = await (globalThis as any).$fetch('/api/mongo/database/delete', { method: 'POST', body: { db } })
+            // refresh database list and clear active selections if needed
+            await this.listDatabases()
+            if (this.activeDb === db) {
+                this.activeDb = null
+                this.collections = []
+                this.activeCollection = null
+                this.docs = []
+            }
+            return res
+        },
+        async renameDatabase(from: string, to: string) {
+            const res = await (globalThis as any).$fetch('/api/mongo/database/rename', { method: 'POST', body: { from, to } })
+            // refresh database list
+            await this.listDatabases()
+            if (this.activeDb === from) {
+                this.activeDb = to
+            }
+            return res
+        },
         async listCollections(db: string) {
             this.activeDb = db
             const res = await (globalThis as any).$fetch(`/api/mongo/collections?db=${encodeURIComponent(db)}`)
