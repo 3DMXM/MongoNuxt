@@ -3,7 +3,7 @@ module.exports = {
         {
             name: "Mongo",
             port: "4659",
-            exec_mode: "cluster",
+            exec_mode: "fork",
             instances: "max",
             script: "./.output/server/index.mjs",
         }
