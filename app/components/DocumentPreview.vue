@@ -15,9 +15,11 @@
                     @click="$emit('refresh')"
                     :icon="Refresh"
                     :loading="refreshing"
+                    >刷新</el-button
                 >
-                    刷新
-                </el-button>
+                <el-button @click="openBulkCreate" type="info" size="default"
+                    >批量新建</el-button
+                >
             </div>
 
             <!-- Filter input -->
@@ -64,13 +66,12 @@
                     <div class="flex items-center justify-between">
                         <span
                             class="text-sm font-medium text-gray-600 dark:text-gray-400"
+                            >文档 #{{ index + 1 }}</span
                         >
-                            文档 #{{ index + 1 }}
-                        </span>
                         <div class="flex items-center space-x-2">
-                            <el-tag v-if="doc._id" size="small" type="info">
-                                ID: {{ getShortId(doc._id) }}
-                            </el-tag>
+                            <el-tag v-if="doc._id" size="small" type="info"
+                                >ID: {{ getShortId(doc._id) }}</el-tag
+                            >
                             <el-tooltip content="编辑文档" placement="top">
                                 <el-button
                                     @click="openEditModal(doc)"
@@ -154,6 +155,53 @@
             :document="selectedDocument"
             @delete="handleDeleteDocument"
         />
+
+        <!-- Bulk Create Modal -->
+        <el-dialog v-model="showBulkCreate" title="批量新建文档" width="60%">
+            <div class="space-y-4">
+                <p class="text-sm text-gray-600">
+                    支持粘贴 JSON 数组或 NDJSON（每行一个 JSON 对象）。
+                </p>
+                <el-input
+                    v-model="bulkContent"
+                    type="textarea"
+                    :rows="12"
+                    placeholder='例如: [{"a":1},{"b":2}] 或 每行一个 JSON'
+                    class="font-mono"
+                />
+                <el-alert
+                    v-if="bulkError"
+                    :title="bulkError"
+                    type="error"
+                    :closable="false"
+                    show-icon
+                />
+                <div class="flex items-center space-x-2">
+                    <el-button @click="pasteFromClipboard"
+                        >从剪贴板粘贴</el-button
+                    >
+                    <el-upload
+                        :before-upload="handleFileUpload"
+                        :show-file-list="false"
+                    >
+                        <el-button>上传文件 (json / ndjson)</el-button>
+                    </el-upload>
+                </div>
+            </div>
+            <template #footer>
+                <div class="flex justify-end space-x-2">
+                    <el-button @click="() => (showBulkCreate = false)"
+                        >取消</el-button
+                    >
+                    <el-button
+                        type="primary"
+                        :loading="bulkSaving"
+                        @click="confirmBulkCreate"
+                        >创建</el-button
+                    >
+                </div>
+            </template>
+        </el-dialog>
     </div>
 </template>
 
@@ -190,6 +238,10 @@ const showEditor = ref(false);
 const showDeleteConfirm = ref(false);
 const selectedDocument = ref<any>(null);
 const isEditMode = ref(false);
+const showBulkCreate = ref(false);
+const bulkContent = ref("");
+const bulkError = ref("");
+const bulkSaving = ref(false);
 const refreshing = ref(false);
 
 // Filter state
@@ -332,6 +384,102 @@ async function handleDeleteDocument() {
         showDeleteConfirm.value = false;
     } catch (error: any) {
         ElMessage.error("删除失败: " + (error.message || "删除操作失败"));
+    }
+}
+
+// Bulk create handlers
+function openBulkCreate() {
+    bulkContent.value = "";
+    bulkError.value = "";
+    showBulkCreate.value = true;
+}
+
+async function pasteFromClipboard() {
+    try {
+        const text = await navigator.clipboard.readText();
+        bulkContent.value = text;
+    } catch (error) {
+        ElMessage.error("无法访问剪贴板");
+    }
+}
+
+function handleFileUpload(file: File) {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        bulkContent.value = event.target?.result as string;
+    };
+    reader.readAsText(file);
+    // prevent element-plus from uploading automatically
+    return false;
+}
+
+async function confirmBulkCreate() {
+    if (!store.activeDb || !store.activeCollection) {
+        ElMessage.error("请先选择数据库和集合");
+        return;
+    }
+
+    const raw = bulkContent.value || "";
+    if (!raw.trim()) {
+        bulkError.value = "请输入要创建的文档内容";
+        return;
+    }
+
+    let docs: any[] = [];
+    try {
+        const trimmed = raw.trim();
+        if (trimmed.startsWith("[")) {
+            // JSON array
+            docs = JSON.parse(trimmed);
+            if (!Array.isArray(docs)) throw new Error("解析为非数组结构");
+        } else {
+            // try NDJSON: each line is a JSON object
+            const lines = trimmed
+                .split(/\r?\n/)
+                .map((l) => l.trim())
+                .filter(Boolean);
+            if (lines.length === 1) {
+                // single JSON object
+                const first = lines[0];
+                const obj = JSON.parse(first as string);
+                docs = [obj];
+            } else {
+                docs = lines.map((l) => JSON.parse(l as string));
+            }
+        }
+    } catch (err: any) {
+        bulkError.value = "解析失败: " + (err?.message || String(err));
+        return;
+    }
+
+    if (!docs.length) {
+        bulkError.value = "未找到任何要插入的文档";
+        return;
+    }
+
+    bulkSaving.value = true;
+    bulkError.value = "";
+    try {
+        const res = await store.createDocuments(
+            store.activeDb,
+            store.activeCollection,
+            docs as any
+        );
+        const inserted =
+            res?.insertedCount ?? res?.insertedIds
+                ? res.insertedCount ?? Object.keys(res.insertedIds || {}).length
+                : 0;
+        ElMessage.success(`批量创建完成，已插入 ${inserted} 条文档`);
+        showBulkCreate.value = false;
+        bulkContent.value = "";
+        // refresh explicitly
+        try {
+            await store.refreshDocuments();
+        } catch (e) {}
+    } catch (err: any) {
+        bulkError.value = err?.statusMessage || err?.message || String(err);
+    } finally {
+        bulkSaving.value = false;
     }
 }
 </script>

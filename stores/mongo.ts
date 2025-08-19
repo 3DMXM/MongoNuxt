@@ -168,6 +168,14 @@ export const useMongoStore = defineStore('mongo', {
             const res = await (globalThis as any).$fetch('/api/mongo/create', { method: 'POST', body: { db, collection, document } })
             return res
         },
+        async createDocuments(db: string, collection: string, documents: any[] | string) {
+            const res = await (globalThis as any).$fetch('/api/mongo/create-many', { method: 'POST', body: { db, collection, documents } })
+            // refresh documents view if currently viewing this collection
+            if (this.activeDb === db && this.activeCollection === collection) {
+                try { await this.refreshDocuments() } catch (e) { }
+            }
+            return res
+        },
         async updateDocument(db: string, collection: string, filter: any, update: any, upsert = false) {
             const res = await (globalThis as any).$fetch('/api/mongo/update', { method: 'POST', body: { db, collection, filter, update, upsert } })
             return res

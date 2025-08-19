@@ -70,16 +70,31 @@
 
                 <UCard v-if="store.connected && store.activeDb">
                     <template #header>
-                        <div class="flex items-center space-x-2">
-                            <UIcon name="i-heroicons-folder" class="w-4 h-4" />
-                            <h3 class="text-sm font-medium">集合</h3>
-                            <UBadge
-                                color="primary"
-                                variant="soft"
-                                size="sm"
-                                class="ml-auto"
-                                >{{ store.collections.length }}</UBadge
-                            >
+                        <div class="flex items-center justify-between w-full">
+                            <div class="flex items-center space-x-2">
+                                <UIcon
+                                    name="i-heroicons-folder"
+                                    class="w-4 h-4"
+                                />
+                                <h3 class="text-sm font-medium">集合</h3>
+                            </div>
+
+                            <div class="flex items-center space-x-2">
+                                <UBadge
+                                    color="primary"
+                                    variant="soft"
+                                    size="sm"
+                                    >{{ store.collections.length }}</UBadge
+                                >
+
+                                <UButton
+                                    size="xs"
+                                    variant="outline"
+                                    @click="showCreateColl = true"
+                                >
+                                    新建集合
+                                </UButton>
+                            </div>
                         </div>
                     </template>
                     <CollectionList
@@ -299,9 +314,7 @@
                                                 processedDocuments.toLocaleString()
                                             }}
                                             /
-                                            {{
-                                                exportTotal.toLocaleString()
-                                            }}
+                                            {{ exportTotal.toLocaleString() }}
                                             文档
                                         </div>
                                         <div v-if="exportRate > 0">
