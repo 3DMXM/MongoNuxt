@@ -2,11 +2,11 @@ version: '3.8'
 
 services:
   # Nuxt.js 应用
-  mongonux:
+  mongonuxt:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mongonux-app
+    container_name: mongonuxt-app
     restart: unless-stopped
     ports:
       - "4659:4659"
@@ -16,8 +16,6 @@ services:
       - NUXT_PORT=4659
     networks:
       - nuxt-network
-    volumes:
-      - ./:/app # 项目目录与当前目录绑定
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4659/"]
       interval: 30s

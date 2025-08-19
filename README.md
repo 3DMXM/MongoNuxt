@@ -135,20 +135,13 @@ npm run preview # 本地预览构建后的应用
 建议的构建与运行命令（PowerShell）：
 
 ```powershell
-# 在项目根目录构建镜像
-docker build -t mongo-nuxt:latest .
-
-# 运行容器（将容器内 4659 端口映射到宿主机 4659）
-docker run -d --name mongo-nuxt -p 4659:4659 mongo-nuxt:latest
-
-# 查看日志
-docker logs -f mongo-nuxt
+yarn run docker:build
 ```
 
-如果想把容器端口映射到宿主机的 80 端口：
+Docker 运行
 
 ```powershell
-docker run -d --name mongo-nuxt -p 80:4659 mongo-nuxt:latest
+yarn run docker:run
 ```
 
 简短说明与注意事项：
@@ -160,25 +153,35 @@ docker run -d --name mongo-nuxt -p 80:4659 mongo-nuxt:latest
 
 ```yaml
 version: '3.8'
+
 services:
-   app:
-      image: mongo-nuxt:latest
-      build: .
-      ports:
-         - "4659:4659"
-      environment:
-         - NODE_ENV=production
-         # - MONGO_URI=mongodb://mongo:27017
-      restart: unless-stopped
+  # Nuxt.js 应用
+  mongonuxt:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mongonuxt-app
+    restart: unless-stopped
+    ports:
+      - "4659:4659"
+    environment:
+      - NODE_ENV=production
+      - NUXT_HOST=0.0.0.0
+      - NUXT_PORT=4659
+    networks:
+      - nuxt-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4659/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # command: yarn run server
 
-   # 可选：本地 MongoDB 服务示例
-   # mongo:
-   #   image: mongo:6
-   #   volumes:
-   #     - mongo-data:/data/db
-
-#volumes:
-#  mongo-data:
+# 网络
+networks:
+  nuxt-network:
+    driver: bridge
 ```
 
 故障排查：

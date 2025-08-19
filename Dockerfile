@@ -7,8 +7,8 @@ RUN npm install -g pm2
 # 创建工作目录
 WORKDIR /app
 
-# 复制 package.json 和 yarn.lock（如果存在）
-COPY package*.json yarn.lock* ./
+# 复制 所有文件
+COPY . ./
 
 # 设置 Yarn 包管理器版本，安装依赖，构建应用，清理开发依赖
 RUN corepack enable && \

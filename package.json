@@ -8,7 +8,9 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "start": "pm2-runtime pm2ecosystem.config.cjs",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "docker:build": "docker compose build --no-cache",
+    "docker:run": "docker compose up -d mongonuxt"
   },
   "dependencies": {
     "@element-plus/nuxt": "^1.1.4",
