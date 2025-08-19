@@ -39,7 +39,7 @@
             </div>
 
             <div class="text-sm text-gray-500 dark:text-gray-400">
-                共 {{ docs.length }} 个文档
+                共 {{ store.docCount }} 个文档
             </div>
         </div>
 
@@ -115,7 +115,7 @@
                 <div class="relative">
                     <el-scrollbar
                         :max-height="
-                            expandedItems.has(index) ? 'none' : '400px'
+                            expandedItems.has(index) ? 'none' : '250px'
                         "
                     >
                         <pre
@@ -126,11 +126,17 @@
                 </div>
             </el-card>
 
-            <!-- Load More Button -->
-            <div v-if="docs.length >= 20" class="text-center pt-4">
-                <el-button @click="$emit('loadMore')" :icon="Plus">
-                    加载更多文档
-                </el-button>
+            <!-- Pagination -->
+            <div class="text-center pt-4">
+                <el-pagination
+                    v-if="store.docCount > 0"
+                    :current-page="store.currentPage"
+                    :page-size="store.pageSize"
+                    :total="store.docCount"
+                    layout="prev, pager, next, sizes, total"
+                    @current-change="(p) => emit('pageChange', p)"
+                    @size-change="(s) => emit('pageSizeChange', s)"
+                />
             </div>
         </div>
 
@@ -172,6 +178,8 @@ const emit = defineEmits<{
     loadMore: [];
     refresh: [];
     filter: [filter: any | null];
+    pageChange: [page: number];
+    pageSizeChange: [size: number];
 }>();
 
 const store = useMongoStore();

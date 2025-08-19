@@ -1,0 +1,13 @@
+{
+    "servers": {
+        "repomix": {
+            "command": "npx",
+            "args": ["-y", "repomix", "--mcp"]
+        },
+        "desktop-commander": {
+            "command": "npx",
+            "args": ["-y", "@wonderwhy-er/desktop-commander"]
+        }
+    },
+    "inputs": []
+}

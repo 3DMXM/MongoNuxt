@@ -17,13 +17,17 @@
         </div>
 
         <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-3">
+            <div
+                class="flex items-center space-x-3"
+                style="flex-direction: column"
+            >
                 <UButton
                     @click="connectNow"
                     :loading="isLoading"
                     :disabled="!uri.trim() || connected"
                     size="lg"
                     icon="i-heroicons-play"
+                    class="m-2"
                 >
                     {{ connected ? "已连接" : "连接数据库" }}
                 </UButton>
@@ -71,10 +75,12 @@
                     >
                         快速连接选项
                     </h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div class="grid grid-cols-1 gap-2">
                         <UButton
                             @click="
-                                setQuickConnect('mongodb://localhost:27017')
+                                setQuickConnect(
+                                    'mongodb://root:123456@localhost:27017'
+                                )
                             "
                             variant="outline"
                             size="sm"

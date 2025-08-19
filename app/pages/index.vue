@@ -1,19 +1,125 @@
 <template>
-    <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <!-- Header -->
-        <UContainer class="py-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1
-                        class="text-3xl font-bold text-gray-900 dark:text-white"
-                    >
-                        MongoDB 管理器
-                    </h1>
-                    <p class="text-gray-600 dark:text-gray-400 mt-2">
-                        连接和管理您的 MongoDB 数据库
-                    </p>
+    <div class="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+        <!-- Left Sidebar -->
+        <aside
+            class="hidden lg:flex lg:flex-col w-72 bg-white dark:bg-gray-800"
+        >
+            <div class="p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2
+                            class="text-lg font-semibold text-gray-900 dark:text-white"
+                        >
+                            MongoDB 管理器
+                        </h2>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                            快速导航
+                        </p>
+                    </div>
                 </div>
+            </div>
+
+            <div class="p-4 space-y-4 overflow-auto">
+                <UCard>
+                    <template #header>
+                        <div class="flex items-center space-x-2">
+                            <UIcon name="i-heroicons-link" class="w-4 h-4" />
+                            <h3 class="text-sm font-medium">数据库连接</h3>
+                            <UBadge
+                                :color="store.connected ? 'success' : 'error'"
+                                variant="soft"
+                                size="sm"
+                                class="ml-auto"
+                            >
+                                {{ store.connected ? "已连接" : "未连接" }}
+                            </UBadge>
+                        </div>
+                    </template>
+                    <ConnectionForm
+                        @connect="onConnect"
+                        :connected="store.connected"
+                        :loading="connectionLoading"
+                    />
+                </UCard>
+
+                <UCard v-if="store.connected">
+                    <template #header>
+                        <div class="flex items-center space-x-2">
+                            <UIcon
+                                name="i-heroicons-circle-stack"
+                                class="w-4 h-4"
+                            />
+                            <h3 class="text-sm font-medium">数据库</h3>
+                            <UBadge
+                                color="info"
+                                variant="soft"
+                                size="sm"
+                                class="ml-auto"
+                                >{{ store.databases.length }}</UBadge
+                            >
+                        </div>
+                    </template>
+                    <DatabaseList
+                        :databases="store.databases"
+                        :activeDb="store.activeDb"
+                        @select="selectDb"
+                        @rename-db="openRenameDbDialog"
+                        @delete-db="openDeleteDbDialog"
+                    />
+                </UCard>
+
+                <UCard v-if="store.connected && store.activeDb">
+                    <template #header>
+                        <div class="flex items-center space-x-2">
+                            <UIcon name="i-heroicons-folder" class="w-4 h-4" />
+                            <h3 class="text-sm font-medium">集合</h3>
+                            <UBadge
+                                color="primary"
+                                variant="soft"
+                                size="sm"
+                                class="ml-auto"
+                                >{{ store.collections.length }}</UBadge
+                            >
+                        </div>
+                    </template>
+                    <CollectionList
+                        :collections="store.collections"
+                        :activeCollection="store.activeCollection"
+                        @select="selectCollection"
+                        @manage-indexes="openIndexManager"
+                        @rename-collection="openRenameDialog"
+                        @delete-collection="openDeleteCollectionDialog"
+                    />
+                </UCard>
+            </div>
+        </aside>
+
+        <!-- Main Area -->
+        <div class="flex-1 flex flex-col">
+            <!-- Topbar -->
+            <header
+                class="flex items-center justify-between px-6 py-4 bg-white dark:bg-gray-800"
+            >
                 <div class="flex items-center space-x-4">
+                    <button
+                        class="lg:hidden p-2 rounded-md bg-gray-100 dark:bg-gray-700"
+                        @click="$emit('toggle-sidebar')"
+                    >
+                        <UIcon name="i-heroicons-bars-3" class="w-5 h-5" />
+                    </button>
+                    <div>
+                        <h1
+                            class="text-2xl font-semibold text-gray-900 dark:text-white"
+                        >
+                            MongoDB 管理器
+                        </h1>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                            连接和管理您的 MongoDB 数据库
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-3">
                     <UButton @click="openGitHub" icon="i-heroicons-github"
                         >GitHub</UButton
                     >
@@ -24,215 +130,181 @@
                         color="error"
                         variant="outline"
                         icon="i-heroicons-x-mark"
+                        >断开</UButton
                     >
-                        断开连接
-                    </UButton>
                 </div>
-            </div>
-        </UContainer>
+            </header>
 
-        <!-- Main Content -->
-        <UContainer class="pb-12">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <!-- Connection Panel -->
-                <div class="lg:col-span-12">
-                    <UCard>
-                        <template #header>
-                            <div class="flex items-center space-x-2">
-                                <UIcon
-                                    name="i-heroicons-link"
-                                    class="w-5 h-5"
-                                />
-                                <h2 class="text-lg font-semibold">
-                                    数据库连接
-                                </h2>
-                                <UBadge
-                                    :color="
-                                        store.connected ? 'success' : 'error'
-                                    "
-                                    variant="soft"
-                                    size="sm"
-                                >
-                                    {{ store.connected ? "已连接" : "未连接" }}
-                                </UBadge>
-                            </div>
-                        </template>
-
-                        <ConnectionForm
-                            @connect="onConnect"
-                            :connected="store.connected"
-                            :loading="connectionLoading"
-                        />
-                    </UCard>
-                </div>
-
-                <!-- Database and Collection Lists -->
-                <div v-if="store.connected" class="lg:col-span-4 space-y-6">
-                    <!-- Database List -->
-                    <UCard>
-                        <template #header>
-                            <div class="flex items-center space-x-2">
+            <!-- Content -->
+            <main class="p-6 overflow-auto">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Overview Cards -->
+                    <div
+                        class="lg:col-span-12 grid grid-cols-1 md:grid-cols-3 gap-4"
+                    >
+                        <UCard>
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-500">数据库</p>
+                                    <p class="text-xl font-semibold">
+                                        {{ store.databases.length }}
+                                    </p>
+                                </div>
                                 <UIcon
                                     name="i-heroicons-circle-stack"
-                                    class="w-5 h-5"
+                                    class="w-6 h-6 text-gray-400"
                                 />
-                                <h2 class="text-lg font-semibold">
-                                    数据库列表
-                                </h2>
-                                <UBadge color="info" variant="soft" size="sm">
-                                    {{ store.databases.length }}
-                                </UBadge>
-                                <div
-                                    class="ml-auto flex items-center space-x-2"
-                                >
-                                    <UButton
-                                        size="sm"
-                                        @click="showCreateDb = true"
-                                        >新建数据库</UButton
-                                    >
-                                    <UButton
-                                        size="sm"
-                                        :disabled="!store.activeDb"
-                                        @click="
-                                            openRenameDbDialog(store.activeDb)
-                                        "
-                                        >重命名</UButton
-                                    >
-                                    <UButton
-                                        size="sm"
-                                        color="error"
-                                        :disabled="!store.activeDb"
-                                        @click="
-                                            openDeleteDbDialog(store.activeDb)
-                                        "
-                                        >删除</UButton
-                                    >
-                                </div>
                             </div>
-                        </template>
-
-                        <DatabaseList
-                            :databases="store.databases"
-                            :activeDb="store.activeDb"
-                            @select="selectDb"
-                            @rename-db="openRenameDbDialog"
-                            @delete-db="openDeleteDbDialog"
-                        />
-                    </UCard>
-
-                    <!-- Collection List -->
-                    <UCard v-if="store.activeDb">
-                        <template #header>
-                            <div class="flex items-center space-x-2">
+                        </UCard>
+                        <UCard>
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-500">集合</p>
+                                    <p class="text-xl font-semibold">
+                                        {{ store.collections.length }}
+                                    </p>
+                                </div>
                                 <UIcon
                                     name="i-heroicons-folder"
-                                    class="w-5 h-5"
+                                    class="w-6 h-6 text-gray-400"
                                 />
-                                <h2 class="text-lg font-semibold">集合列表</h2>
-                                <UBadge
-                                    color="primary"
-                                    variant="soft"
-                                    size="sm"
-                                >
-                                    {{ store.collections.length }}
-                                </UBadge>
-                                <UButton @click="showCreateColl = true">
-                                    新建集合
-                                </UButton>
                             </div>
-                        </template>
-
-                        <div class="flex items-center justify-between">
-                            <CollectionList
-                                :collections="store.collections"
-                                :activeCollection="store.activeCollection"
-                                @select="selectCollection"
-                                @manage-indexes="openIndexManager"
-                                @rename-collection="openRenameDialog"
-                                @delete-collection="openDeleteCollectionDialog"
-                            ></CollectionList>
-                        </div>
-                    </UCard>
-                </div>
-
-                <!-- Document Preview -->
-                <div
-                    v-if="store.connected && store.activeCollection"
-                    class="lg:col-span-8"
-                >
-                    <UCard>
-                        <template #header>
+                        </UCard>
+                        <UCard>
                             <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-500">
+                                        文档(当前集合)
+                                    </p>
+                                    <p class="text-xl font-semibold">
+                                        {{ store.docCount }}
+                                    </p>
+                                </div>
+                                <UIcon
+                                    name="i-heroicons-document-text"
+                                    class="w-6 h-6 text-gray-400"
+                                />
+                            </div>
+                        </UCard>
+                    </div>
+
+                    <!-- Document Preview (main) -->
+                    <div
+                        v-if="store.connected && store.activeCollection"
+                        class="lg:col-span-8"
+                    >
+                        <UCard>
+                            <template #header>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-2">
+                                        <UIcon
+                                            name="i-heroicons-document-text"
+                                            class="w-5 h-5"
+                                        />
+                                        <h2 class="text-lg font-semibold">
+                                            文档预览
+                                        </h2>
+                                        <UBadge
+                                            color="warning"
+                                            variant="soft"
+                                            size="sm"
+                                            >{{ store.docCount }} 条记录</UBadge
+                                        >
+                                    </div>
+                                    <UButton
+                                        @click="refreshDocuments"
+                                        size="sm"
+                                        variant="outline"
+                                        icon="i-heroicons-arrow-path"
+                                        :loading="loading"
+                                        >刷新</UButton
+                                    >
+                                </div>
+                            </template>
+                            <DocumentPreview
+                                :docs="store.docs"
+                                @refresh="refreshDocuments"
+                                @filter="onApplyFilter"
+                                @pageChange="onPageChange"
+                                @pageSizeChange="onPageSizeChange"
+                            />
+                        </UCard>
+                    </div>
+
+                    <!-- Right column: actions / manager -->
+                    <div class="lg:col-span-4 space-y-6">
+                        <UCard v-if="store.connected && store.activeDb">
+                            <template #header>
                                 <div class="flex items-center space-x-2">
                                     <UIcon
-                                        name="i-heroicons-document-text"
-                                        class="w-5 h-5"
+                                        name="i-heroicons-cog-6-tooth"
+                                        class="w-4 h-4"
                                     />
-                                    <h2 class="text-lg font-semibold">
-                                        文档预览
-                                    </h2>
-                                    <UBadge
-                                        color="warning"
-                                        variant="soft"
-                                        size="sm"
-                                    >
-                                        {{ store.docs.length }} 条记录
-                                    </UBadge>
+                                    <h3 class="text-sm font-medium">
+                                        数据库操作
+                                    </h3>
                                 </div>
-                                <UButton
-                                    @click="refreshDocuments"
-                                    size="sm"
-                                    variant="outline"
-                                    icon="i-heroicons-arrow-path"
-                                    :loading="loading"
+                            </template>
+                            <div class="flex flex-col space-y-2">
+                                <UButton size="sm" @click="showCreateDb = true"
+                                    >新建数据库</UButton
                                 >
-                                    刷新
-                                </UButton>
+                                <UButton
+                                    size="sm"
+                                    :disabled="!store.activeDb"
+                                    @click="openRenameDbDialog(store.activeDb)"
+                                    >重命名数据库</UButton
+                                >
+                                <UButton
+                                    size="sm"
+                                    color="error"
+                                    :disabled="!store.activeDb"
+                                    @click="openDeleteDbDialog(store.activeDb)"
+                                    >删除数据库</UButton
+                                >
+                                <UButton
+                                    size="sm"
+                                    :disabled="!store.activeCollection"
+                                    @click="
+                                        store.activeCollection &&
+                                            openIndexManager(
+                                                store.activeCollection
+                                            )
+                                    "
+                                    >索引管理</UButton
+                                >
                             </div>
-                        </template>
+                        </UCard>
 
-                        <DocumentPreview
-                            :docs="store.docs"
-                            @refresh="refreshDocuments"
-                            @filter="onApplyFilter"
-                        />
-                    </UCard>
+                        <UCard v-if="!store.connected">
+                            <div class="text-center py-8">
+                                <UIcon
+                                    name="i-heroicons-cloud-arrow-up"
+                                    class="w-12 h-12 mx-auto text-gray-400 mb-3"
+                                />
+                                <p class="text-sm text-gray-500">
+                                    请先连接数据库以查看详情
+                                </p>
+                            </div>
+                        </UCard>
+                    </div>
                 </div>
+            </main>
+        </div>
 
-                <!-- Welcome Message -->
-                <div v-if="!store.connected" class="lg:col-span-12">
-                    <UCard>
-                        <div class="text-center py-12">
-                            <UIcon
-                                name="i-heroicons-cloud-arrow-up"
-                                class="w-16 h-16 mx-auto text-gray-400 mb-4"
-                            />
-                            <h3
-                                class="text-xl font-semibold text-gray-900 dark:text-white mb-2"
-                            >
-                                欢迎使用 MongoDB 管理器
-                            </h3>
-                            <p class="text-gray-600 dark:text-gray-400 mb-6">
-                                请在上方输入您的 MongoDB 连接字符串开始使用
-                            </p>
-                            <UButton
-                                @click="scrollToTop"
-                                variant="soft"
-                                icon="i-heroicons-arrow-up"
-                            >
-                                开始连接
-                            </UButton>
-                        </div>
-                    </UCard>
-                </div>
-            </div>
-        </UContainer>
+        <!-- Mobile/Small screen: stack sidebar above content -->
+        <div class="lg:hidden w-full">
+            <!-- keep small connection area for mobile inside main flow if needed -->
+        </div>
+
+        <!-- IndexManager modal stays as component (controlled by showIndexManager) -->
         <IndexManager
             v-model:visible="showIndexManager"
             :db="store.activeDb || ''"
             :collection="indexManagerCollection || ''"
         />
-        <!-- Create Collection Dialog -->
+
+        <!-- Dialogs (kept intact) -->
         <el-dialog v-model="showCreateColl" title="新建集合">
             <div>
                 <el-input v-model="newCollectionName" placeholder="集合名" />
@@ -247,7 +319,6 @@
             </template>
         </el-dialog>
 
-        <!-- Rename Collection Dialog -->
         <el-dialog v-model="showRenameColl" title="重命名集合">
             <div>
                 <el-input v-model="renameTo" placeholder="新的集合名" />
@@ -262,7 +333,6 @@
             </template>
         </el-dialog>
 
-        <!-- Delete Collection Confirm -->
         <el-dialog v-model="showDeleteColl" title="删除集合">
             <div>
                 确认要删除集合：<strong>{{ deleteTarget }}</strong> ?
@@ -278,7 +348,6 @@
             </template>
         </el-dialog>
 
-        <!-- Create Database Dialog -->
         <el-dialog v-model="showCreateDb" title="新建数据库">
             <div>
                 <el-input v-model="newDbName" placeholder="数据库名" />
@@ -293,7 +362,6 @@
             </template>
         </el-dialog>
 
-        <!-- Rename Database Dialog -->
         <el-dialog v-model="showRenameDb" title="重命名数据库">
             <div>
                 <el-input v-model="renameDbTo" placeholder="新的数据库名" />
@@ -308,7 +376,6 @@
             </template>
         </el-dialog>
 
-        <!-- Delete Database Confirm -->
         <el-dialog v-model="showDeleteDb" title="删除数据库">
             <div>
                 确认要删除数据库：<strong>{{ deleteDbTarget }}</strong> ?
@@ -353,6 +420,44 @@ const renameTo = ref("");
 const showDeleteColl = ref(false);
 const deleteTarget = ref<string | null>(null);
 
+// pagination handlers
+async function onPageChange(page: number) {
+    if (!store.activeDb || !store.activeCollection) return;
+    loading.value = true;
+    try {
+        await store.find(
+            store.activeDb,
+            store.activeCollection,
+            currentFilter.value || {},
+            page,
+            store.pageSize
+        );
+    } catch (error: any) {
+        ElMessage.error(error.message || "无法切换页码");
+    } finally {
+        loading.value = false;
+    }
+}
+
+async function onPageSizeChange(size: number) {
+    if (!store.activeDb || !store.activeCollection) return;
+    loading.value = true;
+    try {
+        // reset to page 1 when page size changes
+        await store.find(
+            store.activeDb,
+            store.activeCollection,
+            currentFilter.value || {},
+            1,
+            size
+        );
+    } catch (error: any) {
+        ElMessage.error(error.message || "无法更改每页数量");
+    } finally {
+        loading.value = false;
+    }
+}
+
 async function onConnect(uri: string) {
     if (!uri.trim()) {
         ElMessage.warning("请输入有效的 MongoDB 连接字符串");
@@ -390,7 +495,7 @@ async function selectCollection(collection: string) {
     loading.value = true;
     try {
         currentFilter.value = null;
-        await store.find(store.activeDb, collection, {}, 20);
+        await store.find(store.activeDb, collection, {}, 1, store.pageSize);
         ElMessage.info(`已加载 ${store.docs.length} 个文档`);
     } catch (error: any) {
         ElMessage.error(error.message || "无法获取文档列表");
@@ -561,7 +666,8 @@ async function refreshDocuments() {
             store.activeDb,
             store.activeCollection,
             currentFilter.value || {},
-            20
+            1,
+            store.pageSize
         );
         ElMessage.success(`已重新加载 ${store.docs.length} 个文档`);
     } catch (error: any) {
@@ -584,7 +690,8 @@ async function onApplyFilter(filter: any | null) {
             store.activeDb,
             store.activeCollection,
             filter || {},
-            20
+            1,
+            store.pageSize
         );
         ElMessage.success(`筛选后 ${store.docs.length} 个文档`);
     } catch (error: any) {
