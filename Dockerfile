@@ -1,5 +1,5 @@
 # 使用官方 Node.js LTS 镜像作为基础
-FROM docker.aoe.top/library/node:lts-alpine AS builder
+FROM library/node:lts-alpine AS builder
 
 # 安装 PM2 并创建工作目录
 RUN npm install -g pm2

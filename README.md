@@ -1,4 +1,4 @@
-# MongoDB 管理器
+# MongoNuxt
 
 一个基于 Nuxt 3 和 Nuxt UI 构建的现代化 MongoDB 数据库管理工具。
 
@@ -157,10 +157,7 @@ version: '3.8'
 services:
   # Nuxt.js 应用
   mongonuxt:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: mongonuxt-app
+    image: terry13143/mongo-nuxt:latest
     restart: unless-stopped
     ports:
       - "4659:4659"
